@@ -1,7 +1,12 @@
 import { spawn } from "child_process";
 import { defineConfig } from "cypress";
+import { createRequire } from "module";
 import { MongoMemoryReplSet } from "mongodb-memory-server";
 import waitOn from "wait-on";
+
+const require = createRequire(import.meta.url);
+// Resolve the actual Next CLI file inside node_modules
+const nextBin = require.resolve("next/dist/bin/next");
 
 export default defineConfig({
   e2e: {
@@ -15,8 +20,8 @@ export default defineConfig({
 
       // 2. Starta Next.js servern (på en annan port som ansluter till 1.)
       const server = spawn(
-        "npx",
-        ["next", "dev", "--turbopack", "-p", "3100"],
+        process.execPath,
+        [nextBin, "dev", "--turbopack", "-p", "3100"],
         {
           env: {
             ...process.env,
