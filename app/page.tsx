@@ -52,7 +52,7 @@ export default function Home() {
         body: JSON.stringify({ rating, text }),
       });
       if (!res.ok) {
-        const j = await res.json().catch(() => ({} as any));
+        const j = await res.json().catch(() => ({}));
         setError(j?.error ?? "Something went wrong, please try again.");
         setLoading(false);
         return;
