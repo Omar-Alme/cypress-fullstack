@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import router from "next/router";
 
 const Mood = {
   HAPPY: "😄",
@@ -36,6 +37,37 @@ export default function Home() {
     [rating]
   );
 
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (!rating) return setError("Please choose a rating (1–5).");
+    if (text.trim().length < 10) return setError("Reflection is too short (min 10 characters).");
+
+    setLoading(true);
+    try {
+      const res = await fetch("/api/entries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rating, text }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({} as any));
+        setError(j?.error ?? "Something went wrong, please try again.");
+        setLoading(false);
+        return;
+      }
+      router.push("/history");
+    } catch {
+      setError("Something went wrong, please try again.");
+      setLoading(false);
+    }
+  }
+
+  function reset() {
+    setRating(null);
+    setText("");
+    setError(null);
+  }
 
 
   return (
@@ -53,7 +85,7 @@ export default function Home() {
           </CardHeader>
 
           <CardContent>
-            <form  className="space-y-6">
+            <form onSubmit={onSubmit} className="space-y-6">
               {/* Rating buttons */}
               <div className="space-y-2">
                 <div
@@ -127,12 +159,11 @@ export default function Home() {
                 <Button type="submit" data-testid="submit" disabled={loading} className="px-6">
                   {loading ? "Saving…" : "Save reflection"}
                 </Button>
-                <Button type="button" variant="ghost"  className="px-4">
+                <Button type="button" variant="ghost" onClick={reset} className="px-4">
                   Clear
                 </Button>
               </div>
 
-              {/* Legend (emoji + enum only) */}
               <div className="mt-4 flex flex-wrap justify-center gap-3 text-xs text-muted-foreground">
                 {(Object.keys(Mood) as MoodKey[]).map((k) => (
                   <div key={k} className="flex items-center gap-1">
