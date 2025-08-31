@@ -1,22 +1,22 @@
 "use client";
 
-import { Todo } from "@/generated/prisma";
+import { Entry } from "@/generated/prisma";
 import { useState } from "react";
 
 interface Props {
-  defaultTodos: Todo[];
+  defaultTodos: Entry[];
 }
 
 export default function TodoList({ defaultTodos }: Props) {
-  const [todos, setTodos] = useState(defaultTodos);
+  const [entries, setEntries] = useState(defaultTodos);
 
   return (
     <ul>
-      {todos.map((t) => (
+      {entries.map((t) => (
         <li key={t.id}>
           <span>{t.text}</span>
           <button
-            onClick={() => setTodos(todos.filter(({ id }) => t.id !== id))}
+            onClick={() => setEntries(entries.filter(({ id }) => t.id !== id))}
           >
             🗑️
           </button>
