@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import router from "next/router";
+import { useRouter } from "next/navigation";
 
 const Mood = {
   HAPPY: "😄",
@@ -27,6 +27,7 @@ const ratingToMood: Record<1 | 2 | 3 | 4 | 5, MoodKey> = {
 };
 
 export default function Home() {
+  const router = useRouter();
   const [rating, setRating] = useState<number | null>(null);
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
