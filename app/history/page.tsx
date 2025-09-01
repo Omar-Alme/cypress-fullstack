@@ -1,7 +1,6 @@
 import { db } from "@/lib/prisma";
 import { Mood } from "@/generated/prisma";
 
-// Map Prisma enum → emoji (keys match enum exactly)
 type MoodKey = keyof typeof Mood;
 const moodEmoji: Record<MoodKey, string> = {
     HAPPY: "😄",
@@ -13,6 +12,7 @@ const moodEmoji: Record<MoodKey, string> = {
 };
 
 export default async function HistoryPage() {
+
     const entries = await db.entry.findMany({
         orderBy: { createdAt: "desc" },
         take: 50,

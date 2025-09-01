@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
+import { openai } from "@/lib/openai";
 import { Mood } from "@/generated/prisma";
 
 function isValidRating(n: unknown): n is number {
     return typeof n === "number" && Number.isInteger(n) && n >= 1 && n <= 5;
 }
 
-async function generateInsights(rating: number, text: string) {
-    if (process.env.NODE_ENV === "test") {
+async function getInsights(rating: number, text: string) {
+    if (!process.env.OPENAI_API_KEY || process.env.NODE_ENV === "test") {
         return {
             aiSummary: "You seemed reflective but balanced.",
             aiMood: Mood.CALM,
@@ -15,49 +16,55 @@ async function generateInsights(rating: number, text: string) {
         };
     }
 
-    const t = text.toLowerCase();
-    const aiMood =
-        rating === 5 ? Mood.HAPPY :
-            rating === 4 ? Mood.CALM :
-                rating === 3 ? Mood.NEUTRAL :
-                    t.includes("anxious") ? Mood.ANXIOUS :
-                        t.includes("stress") ? Mood.STRESSED :
-                            Mood.SAD;
-
-    return {
-        aiSummary: "Thanks for reflecting today.",
-        aiMood,
-        aiTip: "Write one specific goal for tomorrow.",
-    };
+    try {
+        const systemPrompt = `
+You are a journaling assistant. Output strict JSON:
+{
+  "aiSummary": "1–2 sentences",
+  "aiMood": one of [HAPPY, CALM, NEUTRAL, STRESSED, ANXIOUS, SAD],
+  "aiTip": "concise actionable tip"
+}`;
+        const resp = await openai.chat.completions.create({
+            model: process.env.OPENAI_MODEL ?? "gpt-4o-mini",
+            temperature: 0.3,
+            messages: [
+                { role: "system", content: systemPrompt },
+                {
+                    role: "user",
+                    content: `Rating: ${rating}\nText: """${text}"""`,
+                },
+            ],
+        });
+        const content = resp.choices?.[0]?.message?.content ?? "";
+        const json = content.startsWith("{") ? JSON.parse(content) : JSON.parse(content.substring(content.indexOf("{")));
+        return {
+            aiSummary: json.aiSummary || null,
+            aiMood: Mood[json.aiMood as keyof typeof Mood] || null,
+            aiTip: json.aiTip || null,
+        };
+    } catch {
+        return null;
+    }
 }
 
 export async function POST(req: Request) {
     const body = await req.json().catch(() => ({}));
-    const rating = body?.rating as number;
-    const text = (body?.text as string | undefined)?.trim() ?? "";
+    const rating = body.rating as number;
+    const text = (body.text as string | undefined)?.trim() || "";
 
-    if (!isValidRating(rating)) {
-        return NextResponse.json({ error: "Rating must be 1-5" }, { status: 400 });
-    }
-    if (text.length < 10) {
-        return NextResponse.json({ error: "Reflection is too short" }, { status: 400 });
-    }
+    if (!isValidRating(rating)) return NextResponse.json({ error: "Rating must be 1-5" }, { status: 400 });
+    if (text.length < 10) return NextResponse.json({ error: "Reflection is too short" }, { status: 400 });
 
-    try {
-        const { aiSummary, aiMood, aiTip } = await generateInsights(rating, text);
-        const entry = await db.entry.create({
-            data: { rating, text, aiSummary, aiMood, aiTip },
-        });
-        return NextResponse.json(entry, { status: 201 });
-    } catch {
-        return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
-    }
-}
+    const insights = await getInsights(rating, text);
 
-export async function GET() {
-    const entries = await db.entry.findMany({
-        orderBy: { createdAt: "desc" },
-        take: 30,
+    const entry = await db.entry.create({
+        data: {
+            rating,
+            text,
+            aiSummary: insights?.aiSummary,
+            aiMood: insights?.aiMood,
+            aiTip: insights?.aiTip,
+        },
     });
-    return NextResponse.json(entries);
+    return NextResponse.json(entry, { status: 201 });
 }
