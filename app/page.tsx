@@ -57,7 +57,11 @@ export default function Home() {
         setLoading(false);
         return;
       }
-      router.push("/history");
+
+
+      const entry = await res.json();
+      const aiMissing = !entry.aiSummary && !entry.aiMood && !entry.aiTip;
+      router.push(aiMissing ? "/history?ai=down" : "/history");
     } catch {
       setError("Something went wrong, please try again.");
       setLoading(false);

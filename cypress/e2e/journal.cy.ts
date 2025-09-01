@@ -6,28 +6,7 @@ describe("AI Daily Reflection Journal", () => {
     cy.task("reseed");
   });
 
-  it("Flow 1 – should allow user to log their day (happy path)", () => {
-    // Stub backend so we don't need the real API yet
-    cy.intercept("POST", "/api/entries", (req) => {
-      const body = req.body;
-      expect(body.rating).to.be.within(1, 5);
-      expect((body.text as string).length).to.be.greaterThan(9);
-
-      req.reply({
-        statusCode: 201,
-        body: {
-          id: "mock-id",
-          rating: body.rating,
-          text: body.text,
-          aiSummary: "You seemed reflective but balanced.",
-          aiMood: "CALM",
-          aiTip: "Plan a 15-minute walk.",
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-      });
-    }).as("createEntry");
-
+  it("Flow 1 – should allow user to log their day (happy path, real API)", () => {
     cy.visit("/");
 
     cy.get('[data-testid="rating-4"]').click();
@@ -36,10 +15,12 @@ describe("AI Daily Reflection Journal", () => {
     );
     cy.get('[data-testid="submit"]').click();
 
-    cy.wait("@createEntry");
-
     cy.location("pathname").should("eq", "/history");
+    cy.location("search").should("eq", "");
+    cy.get('[data-testid="ai-down-banner"]').should("not.exist");
+    cy.get('[data-testid="entry-card"]').should("have.length.at.least", 1);
   });
+
 
   it("Flow 2 – should show an error if user forgets to write text", () => {
     cy.visit("/");
@@ -54,13 +35,35 @@ describe("AI Daily Reflection Journal", () => {
   it("Flow 3 – should handle AI service failure for user", () => {
     cy.visit("http://localhost:3000");
 
-    // TODO: Intercept API call to simulate AI failure (cy.intercept)
-    // TODO: Select a rating (e.g., 2)
-    // TODO: Type a reflection text
-    // TODO: Click Save
-    // TODO: Assert entry is saved without AI fields
-    // TODO: Assert "AI service is currently unavailable" message is shown
+    // Force API to return an entry without AI fields
+    cy.intercept("POST", "/api/entries", (req) => {
+      const b = req.body as { rating: number; text: string };
+      req.reply({
+        statusCode: 201,
+        body: {
+          id: "mock-no-ai",
+          rating: b.rating,
+          text: b.text,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          // no aiSummary/aiMood/aiTip
+        },
+      });
+    }).as("createNoAI");
+
+    cy.visit("/");
+    cy.get('[data-testid="rating-2"]').click();
+    cy.get('[data-testid="text"]').type(
+      "Stressful day but I handled it with breaks."
+    );
+    cy.get('[data-testid="submit"]').click();
+
+    cy.wait("@createNoAI");
+    cy.location("pathname").should("eq", "/history");
+    cy.location("search").should("eq", "?ai=down");
+    cy.get('[data-testid="ai-down-banner"]').should("be.visible");
   });
+
 
   it("Flow 4 – should show user their reflection history", () => {
     cy.visit("http://localhost:3000/history");
