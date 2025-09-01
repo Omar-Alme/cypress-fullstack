@@ -1,30 +1,15 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
-
-const Mood = {
-  HAPPY: "😄",
-  CALM: "🙂",
-  NEUTRAL: "😐",
-  STRESSED: "😟",
-  ANXIOUS: "😰",
-  SAD: "😢",
-} as const;
-type MoodKey = keyof typeof Mood;
-
-const ratingToMood: Record<1 | 2 | 3 | 4 | 5, MoodKey> = {
-  1: "SAD",
-  2: "STRESSED",
-  3: "NEUTRAL",
-  4: "CALM",
-  5: "HAPPY",
-};
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { RatingSelector } from "@/components/home/rating-selector";
+import { MoodPreview } from "@/components/home/mood-preview";
+import { ReflectionTextarea } from "@/components/home/reflection-textarea";
+import { FormError } from "@/components/home/form-error";
+import { Actions } from "@/components/home/actions";
+import { UI_RATING_TO_MOOD, MoodKey } from "@/lib/mood";
+import { MoodLegend } from "@/components/home/mood-legend";
 
 export default function Home() {
   const router = useRouter();
@@ -34,13 +19,14 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
 
   const selectedMoodKey = useMemo<MoodKey | null>(
-    () => (rating ? ratingToMood[rating as 1 | 2 | 3 | 4 | 5] : null),
+    () => (rating ? UI_RATING_TO_MOOD[rating as 1|2|3|4|5] : null),
     [rating]
   );
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+
     if (!rating) return setError("Please choose a rating (1–5).");
     if (text.trim().length < 10) return setError("Reflection is too short (min 10 characters).");
 
@@ -51,6 +37,7 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ rating, text }),
       });
+
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
         setError(j?.error ?? "Something went wrong, please try again.");
@@ -58,10 +45,8 @@ export default function Home() {
         return;
       }
 
-
-      const entry = await res.json();
-      const aiMissing = !entry.aiSummary && !entry.aiMood && !entry.aiTip;
-      router.push(aiMissing ? "/history?ai=down" : "/history");
+      // Simple redirect (we removed the ai=down banner flow)
+      router.push("/history");
     } catch {
       setError("Something went wrong, please try again.");
       setLoading(false);
@@ -73,7 +58,6 @@ export default function Home() {
     setText("");
     setError(null);
   }
-
 
   return (
     <div className="relative min-h-[calc(100vh-4rem)]">
@@ -91,92 +75,19 @@ export default function Home() {
 
           <CardContent>
             <form onSubmit={onSubmit} className="space-y-6">
-              {/* Rating buttons */}
               <div className="space-y-2">
-                <div
-                  role="group"
-                  aria-label="Choose rating 1 to 5"
-                  className="flex flex-wrap items-center justify-center gap-2"
-                >
-                  {[1, 2, 3, 4, 5].map((n) => (
-                    <Button
-                      key={n}
-                      type="button"
-                      data-testid={`rating-${n}`}
-                      aria-pressed={rating === n}
-                      aria-label={`Rating ${n}`}
-                      onClick={() => setRating(n)}
-                      variant={rating === n ? "default" : "outline"}
-                      className={cn(
-                        "h-12 w-12 rounded-full p-0 text-base font-semibold",
-                        "transition-all duration-150",
-                        rating === n ? "shadow-sm" : "hover:scale-[1.03]"
-                      )}
-                      title={`Rating ${n}`}
-                    >
-                      {n}
-                    </Button>
-                  ))}
-                </div>
-
-                <div className="flex items-center justify-center gap-2 pt-1">
-                  {selectedMoodKey ? (
-                    <>
-                      <span className="text-lg" aria-hidden>
-                        {Mood[selectedMoodKey]}
-                      </span>
-                      <Badge variant="secondary" className="uppercase">
-                        {selectedMoodKey}
-                      </Badge>
-                      <span className="text-xs text-muted-foreground">({rating}/5)</span>
-                    </>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">Select a rating to see mood</span>
-                  )}
-                </div>
+                <RatingSelector value={rating} onChangeAction={setRating} />
+                <MoodPreview moodKey={selectedMoodKey} />
               </div>
 
               <div className="space-y-2">
-                <div className="rounded-2xl border bg-background p-2 shadow-sm">
-                  <Textarea
-                    id="text"
-                    data-testid="text"
-                    placeholder="Write your thoughts… (min 10 characters)"
-                    aria-label="Write your reflection"
-                    value={text}
-                    onChange={(e) => setText(e.target.value)}
-                    rows={7}
-                    className={cn(
-                      "min-h-[160px] resize-y border-0 focus-visible:ring-0",
-                      "leading-relaxed bg-background text-foreground"
-                    )}
-                  />
-                </div>
+                <ReflectionTextarea value={text} onChangeAction={setText} />
               </div>
 
-              {error && (
-                <div role="alert" className="text-sm font-medium text-destructive">
-                  {error}
-                </div>
-              )}
+              <FormError message={error} />
+              <Actions submitting={loading} onClearAction={reset} />
 
-              <div className="flex items-center justify-center gap-3">
-                <Button type="submit" data-testid="submit" disabled={loading} className="px-6">
-                  {loading ? "Saving…" : "Save reflection"}
-                </Button>
-                <Button type="button" variant="ghost" onClick={reset} className="px-4">
-                  Clear
-                </Button>
-              </div>
-
-              <div className="mt-4 flex flex-wrap justify-center gap-3 text-xs text-muted-foreground">
-                {(Object.keys(Mood) as MoodKey[]).map((k) => (
-                  <div key={k} className="flex items-center gap-1">
-                    <span aria-hidden>{Mood[k]}</span>
-                    <span className="uppercase">{k}</span>
-                  </div>
-                ))}
-              </div>
+              <MoodLegend />
             </form>
           </CardContent>
         </Card>

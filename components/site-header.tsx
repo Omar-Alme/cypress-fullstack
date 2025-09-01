@@ -23,7 +23,7 @@ export function SiteHeader() {
 
                 {/* Right actions */}
                 <nav className="flex items-center gap-2">
-                    <Button asChild variant="outline" size="sm">
+                    <Button asChild variant="secondary" size="sm">
                         <Link href="/history" data-testid="nav-history" aria-label="Open history">
                             History
                         </Link>
