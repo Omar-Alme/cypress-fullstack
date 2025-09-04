@@ -55,7 +55,9 @@ export async function POST(req: Request) {
     if (!isValidRating(rating)) return NextResponse.json({ error: "Rating must be 1-5" }, { status: 400 });
     if (text.length < 10) return NextResponse.json({ error: "Reflection is too short" }, { status: 400 });
 
-    const insights = await getInsights(rating, text);
+    const testNoAI = req.headers.get("x-test-no-ai") === "1";
+
+    const insights = testNoAI ? null : await getInsights(rating, text);
 
     const entry = await db.entry.create({
         data: {
@@ -66,5 +68,6 @@ export async function POST(req: Request) {
             aiTip: insights?.aiTip,
         },
     });
+
     return NextResponse.json(entry, { status: 201 });
 }
